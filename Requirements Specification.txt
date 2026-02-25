@@ -1,0 +1,392 @@
+==============================================================================================================================================
+|Requirements Specification for Arduino UNO-based Capacitance Meter									     |
+|============================================================================================================================================|
+|Document Control															     |
+|Document Data	Value														             |
+|Document ID	CMETER-SRS-001-VOL1													     |
+|Document Type	Software and Hardware Requirements Specification									     |
+|Date	February 26, 2026														     |
+|Author	Jan Engelbrecht Pedersen													     |
+|Project	Arduino UNO/NANO Capacitance Meter (10nF - 10000µF)									     |
+|Standards	IEC 61000 (EMC), IPC-A-600 (Circuit Quality), IEEE 830-1998 (Requirements Specification), MISRA C:2012 (Coding Standards)    |
+|Last Modified	February 26, 2026													     |
+|Version	1.0															     |
+==============================================================================================================================================
+
+==============================================================================================================================================
+1. Executive Summary
+==============================================================================================================================================
+This document specifies the requirements for a precision capacitance meter based on the Arduino UNO/NANO platform.
+The instrument measures capacitance in the range of 10nF to 10,000µF using the RC time constant method. 
+To ensure accuracy across this wide range, the system employs an auto-ranging architecture with five discrete charging resistors, 
+selectable under software control.
+
+The user interface consists of a momentary push button for measurement initiation and a 16x02 I2C LCD for clear result visualization. 
+For debugging and data logging, measurement results are also output via the serial port.
+
+The firmware is developed according to rigorous procedural programming principles, featuring modular function-based organization, 
+comprehensive static variable encapsulation for state management, and exhaustive commenting to meet the highest industrial 
+and academic standards. This document supersedes the previous version (CMETER-SRS-001-VOL1) by providing a more detailed and technically 
+precise analysis of the implemented firmware and hardware.
+==============================================================================================================================================
+2. Definitions and Clarifications
+==============================================================================================================================================
+2.1 Terminology
+==============================================================================================================================================
+Term			Definition
+Capacitance (C)		An electrical component's ability to store an electrical charge, measured in farads (F).
+RC Time Constant (τ)	The time required for a capacitor to charge to approximately 63.2% of the applied voltage, or discharge to 36.8%. 
+			Defined as τ = R × C.
+Auto-ranging		An automatic process where the instrument selects the most appropriate measurement range (i.e., charging resistor) 
+			to optimize accuracy and measurement speed.
+Oversampling		A signal processing technique where multiple ADC readings are taken and averaged to reduce the impact of random noise 
+			and increase the effective resolution.
+Debounce		A software or hardware method to filter out the mechanical chatter of a switch or button, ensuring a single press 
+			is registered as a single event.
+I2C			Inter-Integrated Circuit, a multi-master, multi-slave, packet-switched, single-ended, 
+			serial communication bus invented by Philips Semiconductor (now NXP Semiconductors).
+GPIO			General Purpose Input/Output. A pin on an integrated circuit whose behavior (input or output) 
+			and logic state can be controlled by software.
+Static Variable		A variable within a function that retains its value between successive calls to that function, 
+			providing a mechanism for data encapsulation.
+==============================================================================================================================================
+2.2 Measurement Principle
+==============================================================================================================================================
+The instrument utilizes the fundamental RC time constant for capacitance calculation. 
+When a capacitor charges from 0V to Vcc through a known resistor, the voltage across it follows the exponential law:
+
+Vc(t) = Vcc × (1 - e^(-t/(R×C)))
+
+At time t = R×C, the voltage is:
+Vc = Vcc × (1 - e⁻¹) = Vcc × 0.63212
+
+By measuring the time (t) required for the capacitor voltage to reach 63.212% of Vcc, and knowing the precise resistance value (R), 
+the capacitance is calculated as:
+
+C = t / R
+
+For practical implementation, time is measured in milliseconds (t_ms). The result is then computed in microfarads (µF) using the formula:
+CµF = (t_ms / R) × 1000
+==============================================================================================================================================
+3. Hardware Requirements Specification
+==============================================================================================================================================
+3.1 System Architecture
+==============================================================================================================================================
+The capacitance meter is comprised of the following primary hardware blocks:
+
+Microcontroller: Arduino UNO or NANO (ATmega328P)
+
+Display: HD44780-compatible 16×2 character LCD with an I2C interface module (PCF8574)
+
+Measurement Network: A network of five charging resistors and one dedicated discharge resistor.
+
+User Input: A single momentary push button using the microcontroller's internal pull-up resistor.
+
+Power Supply: +5V DC, typically sourced from a USB connection or an external regulated power supply.
+==============================================================================================================================================
+3.2 Component Selection and Engineering Justification
+==============================================================================================================================================
+3.2.1 Charging Resistors (R6, R7, R10, R11, R12)
+==============================================================================================================================================
+Designator	Nominal Value	Tolerance	Power Rating	Function    				  GPIO Control Firmware Constant
+R6		1 MΩ		±1%		0.25W		Ultra-Low Range (e.g., 1nF - 1µF)	  D2		chargePin_one
+R7		100 kΩ		±1%		0.25W		Low Range (e.g., 10nF - 10µF)		  D3		chargePin_two
+R10		10 kΩ		±1%		0.25W		Medium Range (e.g., 100nF - 100µF)	  D4		chargePin_three
+R11		1 kΩ		±1%		0.25W		High Range (e.g., 1µF - 1,000µF)	  D5		chargePin_four
+R12		100 Ω		±1%		0.25W		Ultra-High Range (e.g., 10µF - 10,000µF)  D6		chargePin_five
+
+Engineering Justification: The resistor values are chosen in a logarithmic decade progression (1M, 100k, 10k, 1k, 100). 
+This provides overlapping measurement ranges, ensuring any capacitance within the target span can be measured with a 
+charge time between approximately 10ms and 1 second. This optimizes the balance between measurement speed and accuracy. 
+The selection is verified by the fundamental equation t = R × C:
+
+Minimum measurable C: With R6 (1MΩ) and a target minimum t of ~10ms, C_min = t/R = 0.01s / 1e6Ω = 10nF.
+
+Maximum measurable C: With R12 (100Ω) and a maximum t of 1s, C_max = t/R = 1s / 100Ω = 0.01F = 10,000µF.
+
+The requirement for ±1% tolerance resistors is critical for achieving the target accuracy of ±5% after software calibration, 
+as resistor tolerance is a direct source of systematic error. The firmware compensates for the exact, measured value of these resistors
+through the ChargeResistorOne...Five constants.
+==============================================================================================================================================
+3.2.2 Discharge Resistor (R8)
+==============================================================================================================================================
+Designator	Value	Tolerance	Power Rating	Function				GPIO Control
+R8		220 Ω	±5%		0.5W		Rapid and safe capacitor discharge	D7 (dischargePin)
+
+Engineering Justification: The 220Ω resistor provides a fast discharge path while safely limiting the current. 
+Peak discharge current is I = 5V / 220Ω ≈ 22.7mA, which is well within the absolute maximum rating (40mA) for an ATmega328P I/O pin. 
+The 0.5W power rating is adequate, as peak instantaneous power dissipation is P = V²/R = 25/220 ≈ 0.114W. 
+The firmware actively monitors the discharge process until the capacitor voltage reaches zero, ensuring a known 
+initial state (0V) for every measurement.
+==============================================================================================================================================
+3.2.3 Analog Measurement Path
+==============================================================================================================================================
+The DUT node is connected directly to the ADC input (A0). This design relies on the high input impedance of the ATmega328P's 
+ADC to minimize loading on the circuit. No external buffering is used, keeping the design simple and low-cost. 
+Oversampling in the ReadAnaloguePort() function is the primary defense against noise on this node.
+==============================================================================================================================================
+3.2.4 Display Interface (I2C)
+==============================================================================================================================================
+The PCF8574 I2C expander is the industry-standard method for interfacing with HD44780 displays. Its selection is justified by:
+
+Pin Reduction: Reduces the required GPIO from 6 pins to 2 (SDA, SCL), freeing up pins for other functions.
+
+Standardization: Uses the ubiquitous I2C protocol and a well-supported hardware peripheral on the ATmega328P.
+
+Library Support: The Adafruit LiquidCrystal_I2C library provides a robust, high-level API, simplifying firmware development and maintenance.
+==============================================================================================================================================
+3.2.5 Push Button Configuration
+==============================================================================================================================================
+The push button is connected between D8 and GND. The internal pull-up resistor is enabled in software (pinMode(button, INPUT_PULLUP)). 
+This configuration is standard practice as it eliminates the need for external components. 
+The logic is active-low, meaning the pin reads HIGH when released and LOW when pressed. All debouncing is handled in software 
+by the checkButtonPress() function.
+==============================================================================================================================================
+3.3 GPIO Pin Assignment
+==============================================================================================================================================
+Pin	Designation	Function			I/O			Active State		Firmware Constant
+A0	analogPin	Capacitor voltage measurement	Input			Analog (0-5V)		analogPin
+D2	chargePin_one	1MΩ charging resistor enable	Output			HIGH = Charging		chargePin_one
+D3	chargePin_two	100kΩ charging resistor enable	Output			HIGH = Charging		chargePin_two
+D4	chargePin_three	10kΩ charging resistor enable	Output			HIGH = Charging		chargePin_three
+D5	chargePin_four	1kΩ charging resistor enable	Output			HIGH = Charging		chargePin_four
+D6	chargePin_five	100Ω charging resistor enable	Output			HIGH = Charging		chargePin_five
+D7	dischargePin	Discharge path control		Output			LOW = Discharging	dischargePin
+D8	button		Measurement initiation		Input			LOW = Pressed		button
+A4 (SDA)	-	I2C data line			I/O			-			-
+A5 (SCL)	-	I2C clock line			Output			-			-
+==============================================================================================================================================
+4. Software Requirements Specification
+==============================================================================================================================================
+4.1 Software Architecture
+==============================================================================================================================================
+The firmware follows a modular, procedural architecture. The main program flow in loop() is event-driven, responding 
+to user input. All hardware-specific configurations are defined as constants. 
+Global variables manage system-wide data, while static variables within functions provide data encapsulation 
+for state machines, such as the button debouncer.
+==============================================================================================================================================
+4.1.1 Function Modules
+==============================================================================================================================================
+Function Name		Responsibility								Key Global Variables Modified	 Return Type
+setup()			Hardware and peripheral initialization.					buttonState, lastButtonState		void
+loop()			Main program loop: monitors button, orchestrates measurements, manages UI flow.	(Reads all measurement results)	void
+MeasureCapacitor()	Core auto-ranging measurement logic.	error, microFarads, nanoFarads, Size, Resistor, elapsedTime		void
+dischargeCapacitor()	Executes a controlled discharge of the DUT.				Vc					void
+ReadAnaloguePort()	Performs a 4x oversampled read of the ADC.				Counter					int
+checkButtonPress()	Implements a simple, reliable debounce algorithm.			(Modifies internal static vars only)	bool
+initializeDisplay()	Initializes the I2C LCD module.						None					bool
+writeTextAt()		Writes a string to the LCD at a specified row and column.		None					void
+clearDisplay()		Clears the LCD and returns the cursor to the home position.		None					void
+==============================================================================================================================================
+4.2 Function Specifications
+==============================================================================================================================================
+4.2.1 Main Control Functions
+==============================================================================================================================================
+void setup()
+
+Purpose: Initializes all hardware subsystems.
+
+Algorithm:
+
+Configure button pin as INPUT_PULLUP.
+Initialize serial communication at 9600 baud.
+Call initializeDisplay().
+If display initialization fails, print error to serial and halt (while(1)).
+Initialize button state variables.
+Display splash screen on LCD: "Cap Meter v1.0" and "Press button".
+Print ready message to serial monitor.
+void loop()
+
+Purpose: The main event loop. Waits for a valid button press, then executes a measurement and displays the result.
+
+Algorithm:
+
+Call checkButtonPress() to detect a validated press.
+On press:
+a. Display "Measuring!" on LCD.
+b. Call MeasureCapacitor().
+c. Clear LCD.
+d. If no error (error == 0):
+i. Format capacitance (µF or nF) and display on line 0.
+ii. Format charge time in seconds and display on line 1.
+iii. Output results to serial monitor.
+e. If error (error == 1): Display "Error!" and "Out of range".
+f. Enter a wait loop, calling checkButtonPress(), until the next press is detected. This freezes the result on the display.
+g. On next press, clear the display and restore the idle message.
+Small delay (delay(5)) to prevent tight looping when idle.
+==============================================================================================================================================
+4.2.2 Capacitance Measurement Functions
+==============================================================================================================================================
+void MeasureCapacitor()
+
+Purpose: Implements the core auto-ranging algorithm. It attempts to measure the capacitor using increasingly 
+larger resistors (smaller values) until a successful measurement is made within the 1-second timeout.
+
+Algorithm:
+
+Set error = 0. Call dischargeCapacitor().
+Range 1 (1MΩ): Configure pins for R6. Start charging. Wait in a while loop for voltage to reach the 
+threshold (ADC >= 629) OR for timeout (>=1001ms).
+If time < 1001ms: Calculate microFarads = (elapsedTime / ChargeResistorOne) * 1000. Store Resistor = 1. 
+Apply range-specific correction factors for very small capacitances. Determine Size (µF or nF). Return.
+
+Range 2 (100kΩ): If Range 1 timed out, discharge and repeat the process with R7 (ADC threshold 646). 
+If successful, calculate with ChargeResistorTwo, set Resistor = 2, and return.
+
+Range 3 (10kΩ): If Range 2 timed out, discharge and repeat with R10 (ADC threshold 646). 
+If successful, calculate with ChargeResistorThree, set Resistor = 3, and return.
+
+Range 4 (1kΩ): If Range 3 timed out, discharge and repeat with R11 (ADC threshold 640). 
+If successful, calculate with ChargeResistorFour, set Resistor = 4, and return.
+
+Range 5 (100Ω): If Range 4 timed out, discharge and repeat with R12 (ADC threshold 590). 
+If successful, calculate with ChargeResistorFive, set Resistor = 5, and apply range-specific 
+correction factors for very large capacitances. Return.
+Failure: If all ranges time out, set error = 1.
+ADC Thresholds: The thresholds vary per range (629, 646, 640, 590) to compensate for secondary 
+effects like pin output resistance and stray capacitance, effectively fine-tuning the "63.2%" point for each hardware configuration.
+
+void dischargeCapacitor()
+
+Purpose: Safely and completely discharges the capacitor.
+
+Algorithm:
+
+Set all charging pins (chargePin_one through _five) to INPUT (High Z) to isolate them.
+Set dischargePin as OUTPUT and write it LOW, creating a path to ground through R8.
+Read the capacitor voltage in a while (Vc > 0) loop. This ensures the discharge is complete before proceeding.
+Once discharged, set dischargePin back to INPUT (High Z).
+int ReadAnaloguePort()
+
+Purpose: Returns a 4x oversampled and averaged reading from the ADC to reduce noise.
+
+Algorithm:
+
+Initialize a long sum = 0.
+Loop 4 times:
+a. reading = analogRead(analogPin)
+b. sum += reading
+c. Increment global Counter.
+int average = sum / 4
+Return average.
+==============================================================================================================================================
+4.2.3 Button Debounce Function
+==============================================================================================================================================
+bool checkButtonPress() (based on Khaled Magdy's algorithm)
+
+Purpose: Provides a single, debounced trigger for a button press.
+
+Data Encapsulation (static): buttonState, lastButtonState, lastDebounceTime, buttonPressed.
+
+Algorithm:
+
+Read the raw pin state: reading = digitalRead(button).
+If reading != lastButtonState, reset the debounce timer: lastDebounceTime = millis().
+If the state has been stable for longer than debounceDelay (50ms):
+a. If reading != buttonState (a change has occurred):
+i. Update buttonState = reading.
+ii. If the new state is LOW (pressed) AND the press hasn't been reported (!buttonPressed), set buttonPressed = true and return true.
+iii. If the new state is HIGH (released), set buttonPressed = false (ready for next press).
+Update lastButtonState = reading.
+return false.
+==============================================================================================================================================
+4.3 Global Variables and Data Dictionary
+==============================================================================================================================================
+Variable	Type		Scope	Description
+Vt		double		Global	Calculated threshold voltage (Vcc * 0.6322).
+Vc		int		Global	Last read capacitor voltage (oversampled ADC value).
+Counter		int		Global	Total number of ADC samples taken since startup (for diagnostics).
+startTime	unsigned long	Global	millis() timestamp at the start of a charging cycle.
+elapsedTime	unsigned long	Global	Time taken for the capacitor to reach the threshold voltage (ms).
+microFarads	float		Global	Calculated capacitance in microfarads (µF).
+nanoFarads	float		Global	Calculated capacitance in nanofarads (nF).
+Size		int		Global	Unit indicator (micro=0 for µF, nano=1 for nF).
+error		int		Global	Error flag (0 = OK, 1 = out of range).
+Resistor	int		Global	The charging resistor range used (1-5).
+==============================================================================================================================================
+5. Firmware Documentation Standards
+==============================================================================================================================================
+To ensure maintainability, readability, and adherence to industry best practices, all firmware source code shall conform to the following 
+stringent documentation standards.
+
+5.1 File Header Documentation
+Every source file (.ino, .c, .cpp, .h) shall begin with a standardized header block, clearly identifying the file, its purpose, 
+and revision history.
+
+cpp
+// *************************************************************************************************************************************
+// |                                                                                                                                   |
+// | Firmware for Arduino Uno Capacitance Meter                                                                                        |
+// |                                                                                                                                   |
+// | No:        CMETER-001-VOL1                                                                                                        |
+// | Author:    Jan Engelbrecht Pedersen                                                                                               |
+// | Date:      2026-02-24                                                                                                             |
+// | Reviewed:  [Name], [Date]                                                                                                         |
+// | Approved:  [Name], [Date]                                                                                                         |
+// |                                                                                                                                   |
+// *************************************************************************************************************************************
+// | Description: Core measurement and control logic for the auto-ranging capacitance meter.                                           |
+// |              Implements RC time constant method with 5-range auto-selection.                                                      |
+// *************************************************************************************************************************************
+5.2 Function Header Documentation
+Every function shall be preceded by a detailed header describing its role, interface, and operation.
+
+cpp
+// =====================================================================================================================================
+// FUNCTION:     MeasureCapacitor
+// PURPOSE:      Performs auto-ranging capacitance measurement using the RC time constant method.
+// ALGORITHM:    Attempts to charge the capacitor through sequentially smaller resistors (R6..R12)
+//               until the voltage reaches the 63.2% threshold within a 1-second timeout.
+// INPUT:        None (operates on global capacitor connection)
+// OUTPUT:       None (results stored in global variables: microFarads, nanoFarads, Size, error, Resistor)
+// GLOBALS MOD:  error, microFarads, nanoFarads, Size, Resistor, startTime, elapsedTime, Vc
+// NOTES:        The ADC threshold values are range-specific to compensate for pin and stray impedances.
+// =====================================================================================================================================
+5.3 Line-by-Line Commenting
+To ensure the logic is transparent, every logical line of code must include a trailing comment explaining its purpose. 
+This is especially critical for hardware interactions and mathematical operations.
+
+startTime = millis();               // Get current system time as start timestamp for measurement
+Vc = ReadAnaloguePort();            // Read initial capacitor voltage (should be ~0 after discharge)
+digitalWrite(chargePin_one, HIGH);  // Set chargePin_one to 5V - begin charging capacitor through 1MΩ
+microFarads = ((float)elapsedTime / ChargeResistorOne) * 1000;  // C = t / R, scaled to microfarads
+5.4 Section Headers and Code Organization
+Code shall be organized into logical sections using clear, visible separators to improve navigability.
+
+// =====================================================================================================================================
+// CONSTANT DECLARATIONS - Hardware Pin Mapping
+// =====================================================================================================================================
+#define chargePin_one 2             // pin to charge the capacitor - connected to charging resistor R6 (1MΩ)
+#define chargePin_two 3             // pin to charge the capacitor - connected to charging resistor R7 (100kΩ)
+
+// =====================================================================================================================================
+// FUNCTION IMPLEMENTATIONS - Capacitance Measurement
+// =====================================================================================================================================
+void MeasureCapacitor() {
+    // ... function implementation ...
+}
+
+// =====================================================================================================================================
+// FUNCTION IMPLEMENTATIONS - Display Utilities
+// =====================================================================================================================================
+void writeTextAt(int row, int col, const char* text) {
+    // ... function implementation ...
+}
+5.5 Constant and Variable Naming Conventions
+Constants: Use UPPER_SNAKE_CASE (e.g., ChargeResistorOne, TIME_OUT_MS).
+
+Global Variables: Use camelCase starting with a lowercase letter (e.g., microFarads, elapsedTime).
+
+Function Names: Use camelCase starting with an uppercase letter for clarity (e.g., MeasureCapacitor, ReadAnaloguePort).
+
+These standards ensure the codebase remains professional, maintainable, and accessible to other engineers for review and modification.
+==============================================================================================================================================
+6. Conclusion
+==============================================================================================================================================
+This revised requirements specification (Version 2.0) provides an in-depth, technically precise description of the 
+Arduino-based capacitance meter. 
+
+The document highlights key engineering decisions, such as the logarithmic resistor selection for effective auto-ranging, 
+the active-low discharge circuit for safety, and the static-variable-based debounce algorithm for reliable user input. 
+The firmware's modular structure and exhaustive commenting ensure it meets the highest standards for maintainability and clarity. 
+This system, as defined, successfully implements a robust and functional capacitance meter covering a range of 10nF to 10,000µF.
