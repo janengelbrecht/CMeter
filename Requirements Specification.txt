@@ -33,20 +33,27 @@ precise analysis of the implemented firmware and hardware.
 ==============================================================================================================================================
 2.1 Terminology
 ==============================================================================================================================================
-Term			Definition
+Term Definition
 Capacitance (C)		An electrical component's ability to store an electrical charge, measured in farads (F).
-RC Time Constant (τ)	The time required for a capacitor to charge to approximately 63.2% of the applied voltage, or discharge to 36.8%. 
+			RC Time Constant (τ)	
+			The time required for a capacitor to charge to approximately 63.2% of the applied voltage, or discharge to 36.8%. 
 			Defined as τ = R × C.
+					
 Auto-ranging		An automatic process where the instrument selects the most appropriate measurement range (i.e., charging resistor) 
 			to optimize accuracy and measurement speed.
+					
 Oversampling		A signal processing technique where multiple ADC readings are taken and averaged to reduce the impact of random noise 
 			and increase the effective resolution.
+					
 Debounce		A software or hardware method to filter out the mechanical chatter of a switch or button, ensuring a single press 
 			is registered as a single event.
+					
 I2C			Inter-Integrated Circuit, a multi-master, multi-slave, packet-switched, single-ended, 
 			serial communication bus invented by Philips Semiconductor (now NXP Semiconductors).
+					
 GPIO			General Purpose Input/Output. A pin on an integrated circuit whose behavior (input or output) 
 			and logic state can be controlled by software.
+					
 Static Variable		A variable within a function that retains its value between successive calls to that function, 
 			providing a mechanism for data encapsulation.
 ==============================================================================================================================================
@@ -88,12 +95,12 @@ Power Supply: +5V DC, typically sourced from a USB connection or an external reg
 ==============================================================================================================================================
 3.2.1 Charging Resistors (R6, R7, R10, R11, R12)
 ==============================================================================================================================================
-Designator	Nominal Value	Tolerance	Power Rating	Function    				  GPIO Control Firmware Constant
-R6		1 MΩ		±1%		0.25W		Ultra-Low Range (e.g., 1nF - 1µF)	  D2		chargePin_one
-R7		100 kΩ		±1%		0.25W		Low Range (e.g., 10nF - 10µF)		  D3		chargePin_two
-R10		10 kΩ		±1%		0.25W		Medium Range (e.g., 100nF - 100µF)	  D4		chargePin_three
-R11		1 kΩ		±1%		0.25W		High Range (e.g., 1µF - 1,000µF)	  D5		chargePin_four
-R12		100 Ω		±1%		0.25W		Ultra-High Range (e.g., 10µF - 10,000µF)  D6		chargePin_five
+Designator	Nominal Value	Tolerance Power Rating	Function    				 GPIO Control 		Firmware Constant
+R6		1 MΩ		±1%	  0.25W		Ultra-Low Range (e.g., 1nF - 1µF)	 D2			chargePin_one
+R7		100 kΩ		±1%	  0.25W		Low Range (e.g., 10nF - 10µF)		 D3			chargePin_two
+R10		10 kΩ		±1%	  0.25W		Medium Range (e.g., 100nF - 100µF)	 D4			chargePin_three
+R11		1 kΩ		±1%	  0.25W		High Range (e.g., 1µF - 1,000µF)	 D5			chargePin_four
+R12		100 Ω		±1%	  0.25W		Ultra-High Range (e.g., 10µF - 10,000µF) D6			chargePin_five
 
 Engineering Justification: The resistor values are chosen in a logarithmic decade progression (1M, 100k, 10k, 1k, 100). 
 This provides overlapping measurement ranges, ensuring any capacitance within the target span can be measured with a 
@@ -110,8 +117,8 @@ through the ChargeResistorOne...Five constants.
 ==============================================================================================================================================
 3.2.2 Discharge Resistor (R8)
 ==============================================================================================================================================
-Designator	Value	Tolerance	Power Rating	Function				GPIO Control
-R8		220 Ω	±5%		0.5W		Rapid and safe capacitor discharge	D7 (dischargePin)
+Designator	Value	Tolerance	Power Rating	Function							GPIO Control
+R8		220 Ω	±5%			0.5W	Rapid and safe capacitor discharge				D7 (dischargePin)
 
 Engineering Justification: The 220Ω resistor provides a fast discharge path while safely limiting the current. 
 Peak discharge current is I = 5V / 220Ω ≈ 22.7mA, which is well within the absolute maximum rating (40mA) for an ATmega328P I/O pin. 
@@ -144,17 +151,17 @@ by the checkButtonPress() function.
 ==============================================================================================================================================
 3.3 GPIO Pin Assignment
 ==============================================================================================================================================
-Pin	Designation	Function			I/O			Active State		Firmware Constant
-A0	analogPin	Capacitor voltage measurement	Input			Analog (0-5V)		analogPin
-D2	chargePin_one	1MΩ charging resistor enable	Output			HIGH = Charging		chargePin_one
-D3	chargePin_two	100kΩ charging resistor enable	Output			HIGH = Charging		chargePin_two
-D4	chargePin_three	10kΩ charging resistor enable	Output			HIGH = Charging		chargePin_three
-D5	chargePin_four	1kΩ charging resistor enable	Output			HIGH = Charging		chargePin_four
-D6	chargePin_five	100Ω charging resistor enable	Output			HIGH = Charging		chargePin_five
-D7	dischargePin	Discharge path control		Output			LOW = Discharging	dischargePin
-D8	button		Measurement initiation		Input			LOW = Pressed		button
-A4 (SDA)	-	I2C data line			I/O			-			-
-A5 (SCL)	-	I2C clock line			Output			-			-
+Pin		Designation	Function						I/O			Active State Firmware Constant
+A0		analogPin	Capacitor voltage measurement	Input			Analog (0-5V)		analogPin
+D2		chargePin_one	1MΩ charging resistor enable	Output			HIGH = Charging		chargePin_one
+D3		chargePin_two	100kΩ charging resistor enable	Output			HIGH = Charging		chargePin_two
+D4		chargePin_three	10kΩ charging resistor enable	Output			HIGH = Charging		chargePin_three
+D5		chargePin_four	1kΩ charging resistor enable	Output			HIGH = Charging		chargePin_four
+D6		chargePin_five	100Ω charging resistor enable	Output			HIGH = Charging		chargePin_five
+D7		dischargePin	Discharge path control		Output			LOW = Discharging	dischargePin
+D8		button		Measurement initiation		Input			LOW = Pressed		button
+A4(SDA)			-	I2C data line			I/O			-			-
+A5(SCL)			-	I2C clock line			Output			-			-
 ==============================================================================================================================================
 4. Software Requirements Specification
 ==============================================================================================================================================
@@ -167,16 +174,16 @@ for state machines, such as the button debouncer.
 ==============================================================================================================================================
 4.1.1 Function Modules
 ==============================================================================================================================================
-Function Name		Responsibility								Key Global Variables Modified	 Return Type
-setup()			Hardware and peripheral initialization.					buttonState, lastButtonState		void
-loop()			Main program loop: monitors button, orchestrates measurements, manages UI flow.	(Reads all measurement results)	void
-MeasureCapacitor()	Core auto-ranging measurement logic.	error, microFarads, nanoFarads, Size, Resistor, elapsedTime		void
-dischargeCapacitor()	Executes a controlled discharge of the DUT.				Vc					void
-ReadAnaloguePort()	Performs a 4x oversampled read of the ADC.				Counter					int
-checkButtonPress()	Implements a simple, reliable debounce algorithm.			(Modifies internal static vars only)	bool
-initializeDisplay()	Initializes the I2C LCD module.						None					bool
-writeTextAt()		Writes a string to the LCD at a specified row and column.		None					void
-clearDisplay()		Clears the LCD and returns the cursor to the home position.		None					void
+Function Name	     Responsibility					   Key Global Variables 	   		  	   Return Type
+setup()		     Hardware and peripheral initialization.		   buttonState, lastButtonState				  	  void
+loop()		     Main program loop: monitors button, orchestrates measurements, manages UI flow.	(Reads all measurement results)	  void
+MeasureCapacitor()   Core auto-ranging measurement logic.		   error, microFarads, nanoFarads, Size, Resistor, elapsedTime	  void
+dischargeCapacitor() Executes a controlled discharge of the DUT.	   Vc								  void
+ReadAnaloguePort()   Performs a 4x oversampled read of the ADC.		   Counter							   int
+checkButtonPress()   Implements a simple, reliable debounce algorithm.	   (Modifies internal static vars only)				  bool
+initializeDisplay()  Initializes the I2C LCD module.		            None							  bool
+writeTextAt()	     Writes a string to the LCD at a specified row and column.  None							  void
+clearDisplay()	     Clears the LCD and returns the cursor to the home position.None							  void
 ==============================================================================================================================================
 4.2 Function Specifications
 ==============================================================================================================================================
@@ -242,6 +249,7 @@ If successful, calculate with ChargeResistorFour, set Resistor = 4, and return.
 Range 5 (100Ω): If Range 4 timed out, discharge and repeat with R12 (ADC threshold 590). 
 If successful, calculate with ChargeResistorFive, set Resistor = 5, and apply range-specific 
 correction factors for very large capacitances. Return.
+
 Failure: If all ranges time out, set error = 1.
 ADC Thresholds: The thresholds vary per range (629, 646, 640, 590) to compensate for secondary 
 effects like pin output resistance and stray capacitance, effectively fine-tuning the "63.2%" point for each hardware configuration.
@@ -292,17 +300,17 @@ return false.
 ==============================================================================================================================================
 4.3 Global Variables and Data Dictionary
 ==============================================================================================================================================
-Variable	Type		Scope	Description
-Vt		double		Global	Calculated threshold voltage (Vcc * 0.6322).
-Vc		int		Global	Last read capacitor voltage (oversampled ADC value).
-Counter		int		Global	Total number of ADC samples taken since startup (for diagnostics).
-startTime	unsigned long	Global	millis() timestamp at the start of a charging cycle.
-elapsedTime	unsigned long	Global	Time taken for the capacitor to reach the threshold voltage (ms).
-microFarads	float		Global	Calculated capacitance in microfarads (µF).
-nanoFarads	float		Global	Calculated capacitance in nanofarads (nF).
-Size		int		Global	Unit indicator (micro=0 for µF, nano=1 for nF).
-error		int		Global	Error flag (0 = OK, 1 = out of range).
-Resistor	int		Global	The charging resistor range used (1-5).
+Variable	Type			Scope	Description
+Vt		double			Global	Calculated threshold voltage (Vcc * 0.6322).
+Vc		int			Global	Last read capacitor voltage (oversampled ADC value).
+Counter		int			Global	Total number of ADC samples taken since startup (for diagnostics).
+startTime	unsigned long		Global	millis() timestamp at the start of a charging cycle.
+elapsedTime	unsigned long		Global	Time taken for the capacitor to reach the threshold voltage (ms).
+microFarads	float			Global	Calculated capacitance in microfarads (µF).
+nanoFarads	float			Global	Calculated capacitance in nanofarads (nF).
+Size		int			Global	Unit indicator (micro=0 for µF, nano=1 for nF).
+error		int			Global	Error flag (0 = OK, 1 = out of range).
+Resistor	int			Global	The charging resistor range used (1-5).
 ==============================================================================================================================================
 5. Firmware Documentation Standards
 ==============================================================================================================================================
