@@ -18,7 +18,7 @@ Elektronikudvikling i dag er ikke kun et spørgsmål om at lodde. Det er en
 symbiose mellem fire discipliner: Matematisk simulering, elektrisk analyse,
 interaktiv software-verificering og mekanisk præcision.
 
-I denne bog lærer du at mestre en værktøjskasse bestående af:
+I denne artikel lærer du at mestre en værktøjskasse bestående af:
 
 MATLAB/SIMULINK til den komplekse matematiske logik.
 
